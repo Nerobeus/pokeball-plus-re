@@ -16,6 +16,7 @@ ICI = os.path.dirname(os.path.abspath(__file__))
 SR = 8000
 ACT0 = 70                     # activités 70 à 79
 ACT_AMBIANCE = 100            # lumière d'ambiance
+ACT_ETEINT = 101              # LED éteinte (la montre la joue en lâchant la balle)
 K, BLANC, ROUGE = (0, 0, 0), (15, 15, 15), (15, 0, 0)
 CYAN = (2, 14, 15)            # 0x22E4FF, teinte NÉON de l'interface d'Echoes (THEMES de hud.c), sur 4 bits
 
@@ -35,7 +36,8 @@ MOTIFS = {
     65: (1, [(3, (15, 12, 0)), (3, (0, 15, 2)), (3, (15, 12, 0)), (3, (0, 15, 2)), (8, (15, 12, 0)), (1, K)]),   # victoire
     66: (1, [(3, (0, 4, 1)), (3, (0, 9, 2)), (8, (0, 15, 4)), (3, (0, 9, 2)), (3, (0, 4, 1)), (1, K)]),          # soin
     67: (1, [(8, (10, 0, 0)), (8, (3, 0, 0)), (8, (10, 0, 0)), (8, (3, 0, 0)), (12, (6, 0, 0)), (1, K)]),        # défaite
-    68: (0x1f, [(10, CYAN)]),                                                            # ambiance : cyan en boucle
+    68: (0x14, [(10, CYAN)]),   # ambiance : cyan 10 s, rejouée par la montre ; jamais 1f (boucle sans fin : la balle ne dort plus)
+    69: (1, [(1, K)]),                                                                   # éteint
 }
 # Activités, dans l'ordre ENG_EFFET_* : (motif, son du jeu 0 ou None)
 EFFETS = [
@@ -44,6 +46,7 @@ EFFETS = [
     ('coup porté', None, 24),                                                            # vibration seule
 ]
 AMBIANCE = ('ambiance', 68, None)
+ETEINT = ('éteint', 69, None)
 
 ETAT_ACT, ENR_ACT = 0x55000, 0x551fc           # activité n : état, enregistrement de 0x20 octets
 ETAT_LED, ENR_LED = 0x5917c, 0x59378           # motif n : état, enregistrement de 0x80 octets
@@ -94,6 +97,7 @@ def main():
             T.append(trame(0x88, struct.pack('<II', a, len(w)))); verif.append(f'son {n} : CRC {zlib.crc32(w).to_bytes(4, "little").hex(" ")}')
     acts = {ACT0 + k: e for k, e in enumerate(EFFETS)}
     acts[ACT_AMBIANCE] = AMBIANCE
+    acts[ACT_ETEINT] = ETEINT
     if '--activites' in sys.argv:
         garde = {int(x) for x in sys.argv[sys.argv.index('--activites') + 1].split(',')}
         acts = {a: e for a, e in acts.items() if a in garde}
@@ -104,7 +108,7 @@ def main():
         donnees = b'\x00' + struct.pack('<H', 0xffff if led is None else led) + (struct.pack('<HB', son, 0) if son is not None else b'\xff\xff\xff')
         T += ecrire(ENR_ACT + 0x20 * a, ENTETE + donnees)
     for a in acts: T += ecrire(ETAT_ACT + a, b'\x00')   # états en dernier : une activité n'existe qu'une fois complète
-    T.append(lire(ETAT_ACT + ACT0, ACT_AMBIANCE - ACT0 + 1))
+    T.append(lire(ETAT_ACT + ACT0, ACT_ETEINT - ACT0 + 1))
     open(sortie, 'w').write('\n'.join(t.hex() for t in T) + '\n')
     print(f'{len(T)} trames dans {sortie}')
     for v in verif: print(v)
