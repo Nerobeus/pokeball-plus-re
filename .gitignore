@@ -1,0 +1,6 @@
+pbp_cmd.txt
+*.log
+*.bin
+*.wav
+effets.txt
+__pycache__/
